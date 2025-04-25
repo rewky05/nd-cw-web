@@ -1,562 +1,398 @@
-"use client"
+"use client";
 
-import type React from "react"
+import { useState, useEffect } from "react";
+import {
+  ref,
+  onValue,
+  push,
+  set,
+  update,
+  remove,
+} from "firebase/database";
+import { database } from "@/lib/firebase";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PlusCircle, Pencil, Trash2, ImagePlus } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-// Mock database object
-const db = {
-  Branches: {
-    branch1: {
-      Services: {
-        service1: {
-          name: "Basic Wash",
-          sedanPrice: 50,
-          suvPrice: 75,
-          pickupPrice: 100,
-          estimatedTime: 30,
-        },
-        service2: {
-          name: "Premium Wash",
-          sedanPrice: 75,
-          suvPrice: 100,
-          pickupPrice: 125,
-          estimatedTime: 45,
-        },
-      },
-    },
-    branch2: {
-      Services: {
-        service3: {
-          name: "Deluxe Wash",
-          sedanPrice: 100,
-          suvPrice: 125,
-          pickupPrice: 150,
-          estimatedTime: 60,
-        },
-      },
-    },
-  },
-}
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { PlusCircle, Pencil, Trash2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Advertisement = {
-  id: string
-  title: string
-  description: string
-  image: string
-  type: "promotion" | "service"
-  status: "active" | "inactive"
-}
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  type: "promotion" | "service";
+  status: "active" | "inactive";
+};
 
-type Service = {
-  id: string
-  name: string
-  description: string
-  price: {
-    sedan: number
-    suv: number
-    pickup: number
-  }
-  estimatedTime: number
-  image: string
-}
+const DEFAULT_IMAGE = "/placeholder.svg";
 
 export default function AdvertisementsPage() {
-  const { toast } = useToast()
-  const [isAddAdDialogOpen, setIsAddAdDialogOpen] = useState(false)
-  const [isEditAdDialogOpen, setIsEditAdDialogOpen] = useState(false)
-  const [isDeleteAdDialogOpen, setIsDeleteAdDialogOpen] = useState(false)
-  const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null)
+  const { toast } = useToast();
 
-  const [isAddServiceDialogOpen, setIsAddServiceDialogOpen] = useState(false)
-  const [isEditServiceDialogOpen, setIsEditServiceDialogOpen] = useState(false)
-  const [isDeleteServiceDialogOpen, setIsDeleteServiceDialogOpen] = useState(false)
-  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  // all ads
+  const [ads, setAds] = useState<Advertisement[]>([]);
 
-  // Sample advertisements
-  const advertisements: Advertisement[] = [
-    {
-      id: "ad1",
-      title: "Summer Special Discount",
-      description: "Get 20% off on all premium washes this summer!",
-      image: "/placeholder.svg?height=200&width=400",
-      type: "promotion",
-      status: "active",
-    },
-    {
-      id: "ad2",
-      title: "New Branch Opening",
-      description: "Visit our new branch in Mandaue City and get a free air freshener!",
-      image: "/placeholder.svg?height=200&width=400",
-      type: "promotion",
-      status: "active",
-    },
-    {
-      id: "ad3",
-      title: "Loyalty Program",
-      description: "Join our loyalty program and get every 5th wash free!",
-      image: "/placeholder.svg?height=200&width=400",
-      type: "promotion",
-      status: "inactive",
-    },
-  ]
+  // modal state
+  const [isAddAdOpen, setIsAddAdOpen] = useState(false);
+  const [isAddSvcOpen, setIsAddSvcOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
-  // Extract services from the database
-  const services: Service[] = []
-  Object.values(db.Branches).forEach((branch: any) => {
-    if (branch.Services) {
-      Object.entries(branch.Services).forEach(([id, service]: [string, any]) => {
-        if (!services.some((s) => s.name === service.name)) {
-          services.push({
-            id,
-            name: service.name,
-            description: "Professional car wash service",
-            price: {
-              sedan: service.sedanPrice,
-              suv: service.suvPrice,
-              pickup: service.pickupPrice,
-            },
-            estimatedTime: service.estimatedTime,
-            image: "/placeholder.svg?height=200&width=400",
-          })
-        }
-      })
-    }
-  })
+  // what ad we're editing/deleting
+  const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null);
 
-  const handleAddAd = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Advertisement Added",
-      description: "The advertisement has been added successfully.",
-    })
-    setIsAddAdDialogOpen(false)
+  // load from RTDB
+  useEffect(() => {
+    const adsRef = ref(database, "advertisements");
+    return onValue(adsRef, (snap) => {
+      const data = snap.val() || {};
+      const list: Advertisement[] = Object.entries(data).map(
+        ([id, a]: any) => ({ id, ...a })
+      );
+      setAds(list);
+    });
+  }, []);
+
+  const promotions = ads.filter((a) => a.type === "promotion");
+  const serviceAds = ads.filter((a) => a.type === "service");
+
+  // open handlers
+  function openAddAd() {
+    setSelectedAd(null);
+    setIsAddAdOpen(true);
+  }
+  function openAddSvc() {
+    setSelectedAd(null);
+    setIsAddSvcOpen(true);
+  }
+  function openEdit(ad: Advertisement) {
+    setSelectedAd(ad);
+    setIsEditOpen(true);
+  }
+  function openDelete(ad: Advertisement) {
+    setSelectedAd(ad);
+    setIsDeleteOpen(true);
   }
 
-  const handleEditAd = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Advertisement Updated",
-      description: "The advertisement has been updated successfully.",
-    })
-    setIsEditAdDialogOpen(false)
+  // common delete
+  async function handleDelete() {
+    if (!selectedAd) return;
+    await remove(ref(database, `advertisements/${selectedAd.id}`));
+    toast({ title: "Advertisement Deleted" });
+    setIsDeleteOpen(false);
   }
 
-  const handleDeleteAd = () => {
-    toast({
-      title: "Advertisement Deleted",
-      description: "The advertisement has been deleted successfully.",
-    })
-    setIsDeleteAdDialogOpen(false)
+  // add promotion
+  async function handleAddAd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const title = (form.title as HTMLInputElement).value;
+    const description = (form.description as HTMLTextAreaElement).value;
+    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+
+    const payload = {
+      title,
+      description,
+      imageUrl,
+      type: "promotion" as const,
+      status: "active" as const,
+    };
+
+    await set(push(ref(database, "advertisements")), payload);
+    toast({ title: "Promotion Added" });
+    setIsAddAdOpen(false);
   }
 
-  const handleAddService = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Service Added",
-      description: "The service has been added successfully.",
-    })
-    setIsAddServiceDialogOpen(false)
+  // add service-type ad
+  async function handleAddSvc(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const title = (form.title as HTMLInputElement).value;
+    const description = (form.description as HTMLTextAreaElement).value;
+    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+
+    const payload = {
+      title,
+      description,
+      imageUrl,
+      type: "service" as const,
+      status: "active" as const,
+    };
+
+    await set(push(ref(database, "advertisements")), payload);
+    toast({ title: "Service Ad Added" });
+    setIsAddSvcOpen(false);
   }
 
-  const handleEditService = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Service Updated",
-      description: "The service has been updated successfully.",
-    })
-    setIsEditServiceDialogOpen(false)
-  }
+  // edit existing ad
+  async function handleEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selectedAd) return;
+    const form = e.currentTarget;
+    const title = (form.title as HTMLInputElement).value;
+    const description = (form.description as HTMLTextAreaElement).value;
+    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+    const status = (form.status as any).value as Advertisement["status"];
 
-  const handleDeleteService = () => {
-    toast({
-      title: "Service Deleted",
-      description: "The service has been deleted successfully.",
-    })
-    setIsDeleteServiceDialogOpen(false)
-  }
-
-  const openEditAdDialog = (ad: Advertisement) => {
-    setSelectedAd(ad)
-    setIsEditAdDialogOpen(true)
-  }
-
-  const openDeleteAdDialog = (ad: Advertisement) => {
-    setSelectedAd(ad)
-    setIsDeleteAdDialogOpen(true)
-  }
-
-  const openEditServiceDialog = (service: Service) => {
-    setSelectedService(service)
-    setIsEditServiceDialogOpen(true)
-  }
-
-  const openDeleteServiceDialog = (service: Service) => {
-    setSelectedService(service)
-    setIsDeleteServiceDialogOpen(true)
+    const updates = { title, description, imageUrl, status };
+    await update(ref(database, `advertisements/${selectedAd.id}`), updates);
+    toast({ title: "Advertisement Updated" });
+    setIsEditOpen(false);
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="flex-1 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Advertisements & Services</h2>
+    <div className="p-6 space-y-12">
+      {/* ─── Promotions ─── */}
+      <section>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Promotions</h2>
+          <Button onClick={openAddAd}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Promotion
+          </Button>
         </div>
-        <Tabs defaultValue="advertisements" className="space-y-4">
-          <TabsList>
-            <TabsTrigger
-              value="advertisements"
-              className="data-[state=active]:bg-[#FFD000] data-[state=active]:text-black"
-            >
-              Advertisements
-            </TabsTrigger>
-            <TabsTrigger value="services" className="data-[state=active]:bg-[#FFD000] data-[state=active]:text-black">
-              Services
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="advertisements" className="space-y-4">
-            <div className="flex justify-end">
-              <Dialog open={isAddAdDialogOpen} onOpenChange={setIsAddAdDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Advertisement
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Advertisement</DialogTitle>
-                    <DialogDescription>Enter the details for the new advertisement.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddAd}>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="title" className="text-right">
-                          Title
-                        </Label>
-                        <Input id="title" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">
-                          Description
-                        </Label>
-                        <Textarea id="description" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="type" className="text-right">
-                          Type
-                        </Label>
-                        <Select>
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="promotion">Promotion</SelectItem>
-                            <SelectItem value="service">Service</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="image" className="text-right">
-                          Image
-                        </Label>
-                        <div className="col-span-3">
-                          <div className="flex items-center justify-center w-full">
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <ImagePlus className="w-8 h-8 mb-3 text-gray-500" />
-                                <p className="mb-2 text-sm text-gray-500">
-                                  <span className="font-semibold">Click to upload</span> or drag and drop
-                                </p>
-                                <p className="text-xs text-gray-500">PNG, JPG or GIF (MAX. 2MB)</p>
-                              </div>
-                              <input id="image" type="file" className="hidden" />
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
-                        Add Advertisement
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {advertisements.map((ad) => (
-                <Card key={ad.id} className="overflow-hidden">
-                  <div className="relative">
-                    <img src={ad.image || "/placeholder.svg"} alt={ad.title} className="w-full h-48 object-cover" />
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-white"
-                        onClick={() => openEditAdDialog(ad)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-white"
-                        onClick={() => openDeleteAdDialog(ad)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                    <div className="absolute bottom-2 left-2">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          ad.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {ad.status}
-                      </span>
-                    </div>
+        <ScrollArea>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {promotions.map((ad) => (
+              <Card key={ad.id}>
+                <div className="relative">
+                  <img
+                    src={ad.imageUrl}
+                    alt={ad.title}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <Button size="icon" onClick={() => openEdit(ad)}>
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      onClick={() => openDelete(ad)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
                   </div>
-                  <CardHeader className="pb-2">
-                    <CardTitle>{ad.title}</CardTitle>
-                    <CardDescription className="text-xs uppercase">{ad.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{ad.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-          <TabsContent value="services" className="space-y-4">
-            <div className="flex justify-end">
-              <Dialog open={isAddServiceDialogOpen} onOpenChange={setIsAddServiceDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Service
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Service</DialogTitle>
-                    <DialogDescription>Enter the details for the new service.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddService}>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">
-                          Name
-                        </Label>
-                        <Input id="name" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">
-                          Description
-                        </Label>
-                        <Textarea id="description" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="sedan-price" className="text-right">
-                          Sedan Price
-                        </Label>
-                        <Input id="sedan-price" type="number" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="suv-price" className="text-right">
-                          SUV Price
-                        </Label>
-                        <Input id="suv-price" type="number" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="pickup-price" className="text-right">
-                          Pickup Price
-                        </Label>
-                        <Input id="pickup-price" type="number" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="time" className="text-right">
-                          Est. Time (min)
-                        </Label>
-                        <Input id="time" type="number" className="col-span-3" required />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="service-image" className="text-right">
-                          Image
-                        </Label>
-                        <div className="col-span-3">
-                          <div className="flex items-center justify-center w-full">
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <ImagePlus className="w-8 h-8 mb-3 text-gray-500" />
-                                <p className="mb-2 text-sm text-gray-500">
-                                  <span className="font-semibold">Click to upload</span> or drag and drop
-                                </p>
-                                <p className="text-xs text-gray-500">PNG, JPG or GIF (MAX. 2MB)</p>
-                              </div>
-                              <input id="service-image" type="file" className="hidden" />
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
-                        Add Service
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {services.map((service) => (
-                <Card key={service.id} className="overflow-hidden">
-                  <div className="relative">
-                    <img
-                      src={service.image || "/placeholder.svg"}
-                      alt={service.name}
-                      className="w-full h-48 object-cover"
-                    />
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-white"
-                        onClick={() => openEditServiceDialog(service)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-white"
-                        onClick={() => openDeleteServiceDialog(service)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-                  <CardHeader className="pb-2">
-                    <CardTitle>{service.name}</CardTitle>
-                    <CardDescription>Estimated time: {service.estimatedTime} minutes</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm mb-4">{service.description}</p>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="bg-gray-100 p-2 rounded-md text-center">
-                        <div className="font-medium">Sedan</div>
-                        <div>₱{service.price.sedan}</div>
-                      </div>
-                      <div className="bg-gray-100 p-2 rounded-md text-center">
-                        <div className="font-medium">SUV</div>
-                        <div>₱{service.price.suv}</div>
-                      </div>
-                      <div className="bg-gray-100 p-2 rounded-md text-center">
-                        <div className="font-medium">Pickup</div>
-                        <div>₱{service.price.pickup}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+                  <span
+                    className={`absolute bottom-2 left-2 px-2 py-1 text-xs rounded-full ${
+                      ad.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {ad.status}
+                  </span>
+                </div>
+                <CardHeader className="pt-2">
+                  <CardTitle>{ad.title}</CardTitle>
+                  <CardDescription className="uppercase text-xs">
+                    Promotion
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm">{ad.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
+      </section>
 
-      {/* Edit Advertisement Dialog */}
-      <Dialog open={isEditAdDialogOpen} onOpenChange={setIsEditAdDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      {/* ─── Service Ads ─── */}
+      <section>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Service Ads</h2>
+          <Button onClick={openAddSvc}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Service Ad
+          </Button>
+        </div>
+        <ScrollArea>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {serviceAds.map((ad) => (
+              <Card key={ad.id}>
+                <div className="relative">
+                  <img
+                    src={ad.imageUrl}
+                    alt={ad.title}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <Button size="icon" onClick={() => openEdit(ad)}>
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      onClick={() => openDelete(ad)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                  <span
+                    className={`absolute bottom-2 left-2 px-2 py-1 text-xs rounded-full ${
+                      ad.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {ad.status}
+                  </span>
+                </div>
+                <CardHeader className="pt-2">
+                  <CardTitle>{ad.title}</CardTitle>
+                  <CardDescription className="uppercase text-xs">
+                    Service
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm">{ad.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
+      </section>
+
+      {/* ─── Add Promotion Modal ─── */}
+      <Dialog open={isAddAdOpen} onOpenChange={setIsAddAdOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Add Promotion</DialogTitle>
+            <DialogDescription>Enter the details for your new promotion.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddAd} className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">Title</Label>
+              <Input id="title" name="title" className="col-span-3" required />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="description" className="text-right">Description</Label>
+              <Textarea id="description" name="description" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Input
+                id="imageUrl"
+                name="imageUrl"
+                placeholder="https://..."
+                className="col-span-3"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
+                Add Promotion
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add Service Ad Modal ─── */}
+      <Dialog open={isAddSvcOpen} onOpenChange={setIsAddSvcOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Add Service Ad</DialogTitle>
+            <DialogDescription>Enter the details for your new service ad.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddSvc} className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">Title</Label>
+              <Input id="title" name="title" className="col-span-3" required />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="description" className="text-right">Description</Label>
+              <Textarea id="description" name="description" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Input
+                id="imageUrl"
+                name="imageUrl"
+                placeholder="https://..."
+                className="col-span-3"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
+                Add Service Ad
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Modal (promotion or service) ─── */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Edit Advertisement</DialogTitle>
-            <DialogDescription>Update the advertisement details.</DialogDescription>
+            <DialogDescription>Update the details below.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEditAd}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-title" className="text-right">
-                  Title
-                </Label>
-                <Input id="edit-title" className="col-span-3" defaultValue={selectedAd?.title} required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-description" className="text-right">
-                  Description
-                </Label>
-                <Textarea
-                  id="edit-description"
-                  className="col-span-3"
-                  defaultValue={selectedAd?.description}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-type" className="text-right">
-                  Type
-                </Label>
-                <Select defaultValue={selectedAd?.type}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="promotion">Promotion</SelectItem>
-                    <SelectItem value="service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-status" className="text-right">
-                  Status
-                </Label>
-                <Select defaultValue={selectedAd?.status}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-image" className="text-right">
-                  Image
-                </Label>
-                <div className="col-span-3">
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <ImagePlus className="w-8 h-8 mb-3 text-gray-500" />
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Click to upload</span> or drag and drop
-                        </p>
-                        <p className="text-xs text-gray-500">PNG, JPG or GIF (MAX. 2MB)</p>
-                      </div>
-                      <input id="edit-image" type="file" className="hidden" />
-                    </label>
-                  </div>
-                </div>
-              </div>
+          <form onSubmit={handleEdit} className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">Title</Label>
+              <Input
+                id="title"
+                name="title"
+                defaultValue={selectedAd?.title}
+                className="col-span-3"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="description" className="text-right">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                defaultValue={selectedAd?.description}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">Status</Label>
+              <Select
+                name="status"
+                defaultValue={selectedAd?.status}
+                className="col-span-3"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Input
+                id="imageUrl"
+                name="imageUrl"
+                defaultValue={selectedAd?.imageUrl}
+                placeholder="https://..."
+                className="col-span-3"
+              />
             </div>
             <DialogFooter>
               <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
@@ -567,158 +403,25 @@ export default function AdvertisementsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Advertisement Dialog */}
-      <Dialog open={isDeleteAdDialogOpen} onOpenChange={setIsDeleteAdDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      {/* ─── Delete Confirm ─── */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Advertisement</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this advertisement? This action cannot be undone.
+              Are you sure? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm font-medium">
-              You are about to delete: <span className="font-bold">{selectedAd?.title}</span>
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteAdDialogOpen(false)}>
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAd}>
-              Delete Advertisement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Service Dialog */}
-      <Dialog open={isEditServiceDialogOpen} onOpenChange={setIsEditServiceDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Service</DialogTitle>
-            <DialogDescription>Update the service details.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEditService}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-name" className="text-right">
-                  Name
-                </Label>
-                <Input id="edit-name" className="col-span-3" defaultValue={selectedService?.name} required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-service-description" className="text-right">
-                  Description
-                </Label>
-                <Textarea
-                  id="edit-service-description"
-                  className="col-span-3"
-                  defaultValue={selectedService?.description}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-sedan-price" className="text-right">
-                  Sedan Price
-                </Label>
-                <Input
-                  id="edit-sedan-price"
-                  type="number"
-                  className="col-span-3"
-                  defaultValue={selectedService?.price.sedan}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-suv-price" className="text-right">
-                  SUV Price
-                </Label>
-                <Input
-                  id="edit-suv-price"
-                  type="number"
-                  className="col-span-3"
-                  defaultValue={selectedService?.price.suv}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-pickup-price" className="text-right">
-                  Pickup Price
-                </Label>
-                <Input
-                  id="edit-pickup-price"
-                  type="number"
-                  className="col-span-3"
-                  defaultValue={selectedService?.price.pickup}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-time" className="text-right">
-                  Est. Time (min)
-                </Label>
-                <Input
-                  id="edit-time"
-                  type="number"
-                  className="col-span-3"
-                  defaultValue={selectedService?.estimatedTime}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-service-image" className="text-right">
-                  Image
-                </Label>
-                <div className="col-span-3">
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <ImagePlus className="w-8 h-8 mb-3 text-gray-500" />
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Click to upload</span> or drag and drop
-                        </p>
-                        <p className="text-xs text-gray-500">PNG, JPG or GIF (MAX. 2MB)</p>
-                      </div>
-                      <input id="edit-service-image" type="file" className="hidden" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Service Dialog */}
-      <Dialog open={isDeleteServiceDialogOpen} onOpenChange={setIsDeleteServiceDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Service</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this service? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm font-medium">
-              You are about to delete: <span className="font-bold">{selectedService?.name}</span>
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteServiceDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteService}>
-              Delete Service
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
