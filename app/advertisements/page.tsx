@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  ref,
-  onValue,
-  push,
-  set,
-  update,
-  remove,
-} from "firebase/database";
+import { ref, onValue, push, set, update, remove } from "firebase/database";
 import { database } from "@/lib/firebase";
 
 import { useToast } from "@/components/ui/use-toast";
@@ -32,7 +25,13 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { PlusCircle, Pencil, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -107,9 +106,11 @@ export default function AdvertisementsPage() {
   async function handleAddAd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const title = (form.title as HTMLInputElement).value;
-    const description = (form.description as HTMLTextAreaElement).value;
-    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+    const data = new FormData(form);
+
+    const title = data.get("title")?.toString() ?? "";
+    const description = data.get("description")?.toString() ?? "";
+    const imageUrl = data.get("imageUrl")?.toString() ?? "";
 
     const payload = {
       title,
@@ -128,9 +129,11 @@ export default function AdvertisementsPage() {
   async function handleAddSvc(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const title = (form.title as HTMLInputElement).value;
-    const description = (form.description as HTMLTextAreaElement).value;
-    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+    const data = new FormData(form);
+
+    const title = data.get("title")?.toString() ?? "";
+    const description = data.get("description")?.toString() ?? "";
+    const imageUrl = data.get("imageUrl")?.toString() ?? "";
 
     const payload = {
       title,
@@ -150,9 +153,11 @@ export default function AdvertisementsPage() {
     e.preventDefault();
     if (!selectedAd) return;
     const form = e.currentTarget;
-    const title = (form.title as HTMLInputElement).value;
-    const description = (form.description as HTMLTextAreaElement).value;
-    const imageUrl = (form.imageUrl as HTMLInputElement).value || DEFAULT_IMAGE;
+    const data = new FormData(form);
+
+    const title = data.get("title")?.toString() ?? "";
+    const description = data.get("description")?.toString() ?? "";
+    const imageUrl = data.get("imageUrl")?.toString() ?? "";
     const status = (form.status as any).value as Advertisement["status"];
 
     const updates = { title, description, imageUrl, status };
@@ -278,19 +283,31 @@ export default function AdvertisementsPage() {
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Add Promotion</DialogTitle>
-            <DialogDescription>Enter the details for your new promotion.</DialogDescription>
+            <DialogDescription>
+              Enter the details for your new promotion.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddAd} className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">Title</Label>
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
               <Input id="title" name="title" className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right">Description</Label>
-              <Textarea id="description" name="description" className="col-span-3" />
+              <Label htmlFor="description" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                name="description"
+                className="col-span-3"
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Label htmlFor="imageUrl" className="text-right">
+                Image URL
+              </Label>
               <Input
                 id="imageUrl"
                 name="imageUrl"
@@ -299,7 +316,10 @@ export default function AdvertisementsPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
+              <Button
+                type="submit"
+                className="bg-[#FFD000] hover:bg-[#FFDA44] text-black"
+              >
                 Add Promotion
               </Button>
             </DialogFooter>
@@ -312,19 +332,31 @@ export default function AdvertisementsPage() {
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Add Service Ad</DialogTitle>
-            <DialogDescription>Enter the details for your new service ad.</DialogDescription>
+            <DialogDescription>
+              Enter the details for your new service ad.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddSvc} className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">Title</Label>
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
               <Input id="title" name="title" className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right">Description</Label>
-              <Textarea id="description" name="description" className="col-span-3" />
+              <Label htmlFor="description" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                name="description"
+                className="col-span-3"
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Label htmlFor="imageUrl" className="text-right">
+                Image URL
+              </Label>
               <Input
                 id="imageUrl"
                 name="imageUrl"
@@ -333,7 +365,10 @@ export default function AdvertisementsPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
+              <Button
+                type="submit"
+                className="bg-[#FFD000] hover:bg-[#FFDA44] text-black"
+              >
                 Add Service Ad
               </Button>
             </DialogFooter>
@@ -350,7 +385,9 @@ export default function AdvertisementsPage() {
           </DialogHeader>
           <form onSubmit={handleEdit} className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">Title</Label>
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
               <Input
                 id="title"
                 name="title"
@@ -360,7 +397,9 @@ export default function AdvertisementsPage() {
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right">Description</Label>
+              <Label htmlFor="description" className="text-right">
+                Description
+              </Label>
               <Textarea
                 id="description"
                 name="description"
@@ -369,13 +408,14 @@ export default function AdvertisementsPage() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">Status</Label>
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
               <Select
                 name="status"
                 defaultValue={selectedAd?.status}
-                className="col-span-3"
               >
-                <SelectTrigger>
+                <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -385,7 +425,9 @@ export default function AdvertisementsPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
+              <Label htmlFor="imageUrl" className="text-right">
+                Image URL
+              </Label>
               <Input
                 id="imageUrl"
                 name="imageUrl"
@@ -395,7 +437,10 @@ export default function AdvertisementsPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" className="bg-[#FFD000] hover:bg-[#FFDA44] text-black">
+              <Button
+                type="submit"
+                className="bg-[#FFD000] hover:bg-[#FFDA44] text-black"
+              >
                 Save Changes
               </Button>
             </DialogFooter>
