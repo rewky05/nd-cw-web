@@ -2,11 +2,13 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Edit, Trash2, Eye } from "lucide-react"
 import { db } from "@/lib/db"
 import { DataTable } from "@/components/ui/data-table"
+import { database } from '@/lib/firebase'; // adjust path if needed
+import { ref, get } from 'firebase/database';
 import type { ColumnDef } from "@tanstack/react-table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -36,19 +38,56 @@ export default function CustomersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Extract customers from the database
-  const customers: Customer[] = Object.entries(db.users)
-    .filter(([_, user]: [string, any]) => user.role !== "admin" || !user.role)
-    .map(([id, user]: [string, any]) => {
-      return {
-        id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        contactNumber: user.contactNumber || "+63 9XX XXX XXXX", // Default contact number if not available
-      }
-    })
+useEffect(() => {
+  async function loadCustomers() {
+    const fetchedCustomers = await fetchCustomers();
+    setCustomers(fetchedCustomers);
+  }
+
+  loadCustomers();
+}, []);
+
+  // // Extract customers from the database
+  // const customers: Customer[] = Object.entries(db.users)
+  //   .filter(([_, user]: [string, any]) => user.role !== "admin" || !user.role)
+  //   .map(([id, user]: [string, any]) => {
+  //     return {
+  //       id,
+  //       firstName: user.firstName,
+  //       lastName: user.lastName,
+  //       email: user.email,
+  //       contactNumber: user.contactNumber || "+63 9XX XXX XXXX", // Default contact number if not available
+  //     }
+  //   })
+
+  async function fetchCustomers() {
+    const usersRef = ref(database, 'users'); // points to the 'users' node
+    const snapshot = await get(usersRef);
+  
+    if (!snapshot.exists()) {
+      console.log('No users found');
+      return [];
+    }
+  
+    const usersData = snapshot.val(); // This is your users object
+  
+    const customers: Customer[] = Object.entries(usersData)
+      .filter(([_, user]: [string, any]) => user.role !== "admin" || !user.role)
+      .map(([id, user]: [string, any]) => {
+        return {
+          id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          contactNumber: user.contactNumber || "+63 9XX XXX XXXX",
+        };
+      });
+  
+    return customers;
+  }
+  
 
   const handleAddCustomer = (e: React.FormEvent) => {
     e.preventDefault()
