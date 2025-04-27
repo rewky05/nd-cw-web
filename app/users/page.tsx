@@ -49,19 +49,6 @@ useEffect(() => {
   loadCustomers();
 }, []);
 
-  // // Extract customers from the database
-  // const customers: Customer[] = Object.entries(db.users)
-  //   .filter(([_, user]: [string, any]) => user.role !== "admin" || !user.role)
-  //   .map(([id, user]: [string, any]) => {
-  //     return {
-  //       id,
-  //       firstName: user.firstName,
-  //       lastName: user.lastName,
-  //       email: user.email,
-  //       contactNumber: user.contactNumber || "+63 9XX XXX XXXX", // Default contact number if not available
-  //     }
-  //   })
-
   async function fetchCustomers() {
     const usersRef = ref(database, 'users'); // points to the 'users' node
     const snapshot = await get(usersRef);
