@@ -2,13 +2,13 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Edit, Trash2, Eye } from "lucide-react"
 import { db } from "@/lib/db"
 import { DataTable } from "@/components/ui/data-table"
 import { database } from '@/lib/firebase'; // adjust path if needed
-import { ref, get } from 'firebase/database';
+import { ref, get, update } from 'firebase/database';
 import type { ColumnDef } from "@tanstack/react-table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -40,14 +40,19 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-useEffect(() => {
-  async function loadCustomers() {
-    const fetchedCustomers = await fetchCustomers();
-    setCustomers(fetchedCustomers);
-  }
+  const firstNameRef = useRef<HTMLInputElement | null>(null);
+  const lastNameRef = useRef<HTMLInputElement | null>(null);
+  const emailRef = useRef<HTMLInputElement | null>(null);
+  const contactNumberRef = useRef<HTMLInputElement | null>(null);
 
-  loadCustomers();
-}, []);
+  useEffect(() => {
+    async function loadCustomers() {
+      const fetchedCustomers = await fetchCustomers();
+      setCustomers(fetchedCustomers);
+    }
+
+    loadCustomers();
+  }, []);
 
   async function fetchCustomers() {
     const usersRef = ref(database, 'users'); // points to the 'users' node
@@ -85,14 +90,74 @@ useEffect(() => {
     setIsAddDialogOpen(false)
   }
 
-  const handleEditCustomer = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Customer Updated",
-      description: "The customer has been updated successfully.",
-    })
-    setIsEditDialogOpen(false)
-  }
+  // const handleEditCustomer = (e: React.FormEvent) => {
+  //   e.preventDefault()
+  //   toast({
+  //     title: "Customer Updated",
+  //     description: "The customer has been updated successfully.",
+  //   })
+  //   setIsEditDialogOpen(false)
+  // }
+
+  const handleEditCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Access form values directly from refs
+    const firstName = firstNameRef.current?.value;
+    const lastName = lastNameRef.current?.value;
+    const email = emailRef.current?.value;
+    const contactNumber = contactNumberRef.current?.value;
+
+    const updatedCustomerData: any = {}; // Object to store changes
+
+    // Check if firstName is updated
+    if (firstName !== selectedCustomer?.firstName) {
+      updatedCustomerData.firstName = firstName;
+    }
+
+    // Check if lastName is updated
+    if (lastName !== selectedCustomer?.lastName) {
+      updatedCustomerData.lastName = lastName;
+    }
+
+    // Check if email is updated
+    if (email !== selectedCustomer?.email) {
+      updatedCustomerData.email = email;
+    }
+
+    // Check if contactNumber is updated (if exists)
+    if (contactNumber !== selectedCustomer?.contactNumber) {
+      updatedCustomerData.contactNumber = contactNumber || "+63 9XX XXX XXXX"; // Default value if empty
+    }
+
+    // Only update the fields that were changed
+    if (Object.keys(updatedCustomerData).length > 0) {
+      try {
+        const userRef = ref(database, `users/${selectedCustomer?.id}`);
+        await update(userRef, updatedCustomerData);
+        
+        toast({
+          title: "Customer Updated",
+          description: "The customer details have been updated successfully.",
+        });
+
+        setIsEditDialogOpen(false); // Close the dialog after update
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "There was an error updating the customer details.",
+        });
+        console.error("Error updating customer: ", error);
+      }
+    } else {
+      toast({
+        title: "No Changes",
+        description: "No changes were made to the customer details.",
+      });
+      setIsEditDialogOpen(false); // Close the dialog if no changes were made
+    }
+  };
+  
 
   const handleDeleteCustomer = (customer: Customer) => {
     toast({
@@ -227,7 +292,7 @@ useEffect(() => {
                     <Label htmlFor="email" className="text-right">
                       Email
                     </Label>
-                    <Input id="email" type="email" className="col-span-3" required />
+                    <Input id="email" type="email" className="col-span-3" required/>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="contactNumber" className="text-right">
@@ -269,13 +334,25 @@ useEffect(() => {
                 <Label htmlFor="edit-firstName" className="text-right">
                   First Name
                 </Label>
-                <Input id="edit-firstName" className="col-span-3" defaultValue={selectedCustomer?.firstName} required />
+                <Input
+                  id="edit-firstName"
+                  className="col-span-3"
+                  defaultValue={selectedCustomer?.firstName}
+                  ref={firstNameRef}
+                  required
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-lastName" className="text-right">
                   Last Name
                 </Label>
-                <Input id="edit-lastName" className="col-span-3" defaultValue={selectedCustomer?.lastName} required />
+                <Input
+                  id="edit-lastName"
+                  className="col-span-3"
+                  defaultValue={selectedCustomer?.lastName}
+                  ref={lastNameRef}
+                  required
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-email" className="text-right">
@@ -286,7 +363,9 @@ useEffect(() => {
                   type="email"
                   className="col-span-3"
                   defaultValue={selectedCustomer?.email}
+                  ref={emailRef}
                   required
+                  disabled
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -297,6 +376,7 @@ useEffect(() => {
                   id="edit-contactNumber"
                   className="col-span-3"
                   defaultValue={selectedCustomer?.contactNumber}
+                  ref={contactNumberRef}
                   required
                 />
               </div>
