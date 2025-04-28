@@ -61,16 +61,16 @@ useEffect(() => {
     const usersData = snapshot.val(); // This is your users object
   
     const customers: Customer[] = Object.entries(usersData)
-      .filter(([_, user]: [string, any]) => user.role !== "admin" || !user.role)
-      .map(([id, user]: [string, any]) => {
-        return {
-          id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          contactNumber: user.contactNumber || "+63 9XX XXX XXXX",
-        };
-      });
+  .filter(([_, user]: [string, any]) => user.role !== "admin" && user.role !== "supervisor")
+  .map(([id, user]: [string, any]) => {
+    return {
+      id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      contactNumber: user.contactNumber || "+63 9XX XXX XXXX",
+    };
+  });
   
     return customers;
   }
