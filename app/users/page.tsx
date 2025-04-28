@@ -90,15 +90,6 @@ export default function CustomersPage() {
     setIsAddDialogOpen(false)
   }
 
-  // const handleEditCustomer = (e: React.FormEvent) => {
-  //   e.preventDefault()
-  //   toast({
-  //     title: "Customer Updated",
-  //     description: "The customer has been updated successfully.",
-  //   })
-  //   setIsEditDialogOpen(false)
-  // }
-
   const handleEditCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
 
