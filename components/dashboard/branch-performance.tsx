@@ -1,8 +1,7 @@
-"use client"
-
 import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { db } from "@/lib/db"
+import { getDatabase, ref, get } from "firebase/database"
+import { database } from "@/lib/firebase"
 
 type BranchPerformance = {
   name: string
@@ -14,39 +13,55 @@ export function BranchPerformance() {
   const [branchData, setBranchData] = useState<BranchPerformance[]>([])
 
   useEffect(() => {
-    // Calculate branch performance metrics
-    const calculateBranchPerformance = () => {
+    const fetchPerformanceData = async () => {
       const branchPerformance: Record<string, BranchPerformance> = {}
-
-      // Initialize branch data
-      Object.values(db.Branches).forEach((branch: any) => {
-        const branchName = branch.profile.name
-        branchPerformance[branchName] = {
-          name: branchName,
+  
+      // Step 1: Fetch Branches
+      const branchesSnap = await get(ref(database, "Branches"))
+      const branches = branchesSnap.val()
+  
+      if (!branches) return
+  
+      // Initialize branch performance with names
+      for (const branchId in branches) {
+        const name = branches[branchId]?.profile?.name || "Unknown"
+        branchPerformance[branchId] = {
+          name,
           revenue: 0,
           bookings: 0,
         }
-      })
-
-      // Process reservations by branch to calculate metrics
-      Object.entries(db.Reservations.ReservationsByBranch).forEach(([branchId, branchReservations]) => {
-        Object.values(branchReservations).forEach((dateReservations) => {
-          if (typeof dateReservations === "object" && dateReservations !== null) {
-            Object.values(dateReservations).forEach((reservation: any) => {
-              if (reservation.branchName && reservation.amountDue) {
-                branchPerformance[reservation.branchName].revenue += reservation.amountDue
-                branchPerformance[reservation.branchName].bookings += 1
+      }
+  
+      // Step 2: Fetch Reservations
+      const reservationsSnap = await get(ref(database, "Reservations/ReservationsByBranch"))
+      const reservationsByBranch = reservationsSnap.val()
+  
+      if (reservationsByBranch) {
+        for (const branchId in reservationsByBranch) {
+          const dates = reservationsByBranch[branchId]
+  
+          for (const date in dates) {
+            const transactions = dates[date]
+  
+            for (const txnId in transactions) {
+              const txn = transactions[txnId]
+  
+              if (txn.status === "completed" && typeof txn.amountDue === "number") {
+                if (!branchPerformance[branchId]) continue
+  
+                branchPerformance[branchId].revenue += txn.amountDue
+                branchPerformance[branchId].bookings += 1
               }
-            })
+            }
           }
-        })
-      })
-
+        }
+      }
+  
       setBranchData(Object.values(branchPerformance))
     }
-
-    calculateBranchPerformance()
-  }, [])
+  
+    fetchPerformanceData()
+  }, [])  
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -58,7 +73,6 @@ export function BranchPerformance() {
         </div>
       )
     }
-
     return null
   }
 
@@ -66,12 +80,7 @@ export function BranchPerformance() {
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={branchData}
-        margin={{
-          top: 20,
-          right: 30,
-          left: 20,
-          bottom: 5,
-        }}
+        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
