@@ -176,7 +176,7 @@ export function SalesTable() {
     <DataTable 
       columns={columns} 
       data={transactions} 
-      searchKey="customerName" 
+      searchKey="customer" 
       searchPlaceholder="Search by customer name..."/>
   );
 }
