@@ -5,21 +5,60 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { database } from "@/lib/firebase";
+import { ref, get } from "firebase/database";
+import { parse, isSameMonth, subMonths } from "date-fns";
 
 const BookingsStatCard: React.FC = () => {
   const [totalBookings, setTotalBookings] = useState<number>(0);
+  const [bookingGrowth, setBookingGrowth] = useState<number>(0);
 
   useEffect(() => {
-    // Simulate booking data or replace with real fetch logic
     const fetchBookings = async () => {
-      const simulatedBookings = [
-        { id: 1, name: "John Doe" },
-        { id: 2, name: "Jane Smith" },
-        { id: 3, name: "Alice Johnson" },
-        { id: 4, name: "Bob Brown" },
-      ];
+      const reservationsRef = ref(database, "Reservations/ReservationsByBranch");
+      const snapshot = await get(reservationsRef);
 
-      setTotalBookings(simulatedBookings.length);
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.val();
+      const now = new Date();
+      const lastMonth = subMonths(now, 1);
+
+      let currentMonthBookings = 0;
+      let previousMonthBookings = 0;
+
+      // Iterate through branches
+      Object.values(data).forEach((branch: any) => {
+        // Iterate through dates in each branch
+        Object.keys(branch).forEach((dateKey) => {
+          const parsedDate = parse(dateKey, "MM-dd-yyyy", new Date());
+
+          // Check for completed transactions in each date
+          Object.values(branch[dateKey]).forEach((transaction: any) => {
+            if (transaction.status === "completed") {
+              // If the transaction is from the current month
+              if (isSameMonth(parsedDate, now)) {
+                currentMonthBookings++;
+              }
+              // If the transaction is from the previous month
+              else if (isSameMonth(parsedDate, lastMonth)) {
+                previousMonthBookings++;
+              }
+            }
+          });
+        });
+      });
+
+      // Set the total bookings for the current month
+      setTotalBookings(currentMonthBookings);
+
+      // Calculate booking growth if there were previous bookings
+      if (previousMonthBookings > 0) {
+        const growth = ((currentMonthBookings - previousMonthBookings) / previousMonthBookings) * 100;
+        setBookingGrowth(parseFloat(growth.toFixed(1)));
+      } else {
+        setBookingGrowth(0); // Set growth to 0 if there were no bookings last month
+      }
     };
 
     fetchBookings();
@@ -46,7 +85,9 @@ const BookingsStatCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">+{totalBookings}</div>
-        <p className="text-xs text-muted-foreground">+12.5% from last month</p>
+        <p className="text-xs text-muted-foreground">
+          {bookingGrowth >= 0 ? `+${bookingGrowth}%` : `${bookingGrowth}%`} from last month
+        </p>
       </CardContent>
     </Card>
   );

@@ -5,30 +5,53 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { database } from "@/lib/firebase";
+import { ref, get } from "firebase/database";
+import { parse, isSameMonth, subMonths } from "date-fns";
 
-// Mock or real data fetching can be added here
 const TotalRevenueCard: React.FC = () => {
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [revenueGrowth, setRevenueGrowth] = useState<number>(0);
 
   useEffect(() => {
-    // Simulate calculating revenue (replace with real logic or API call)
     const fetchRevenue = async () => {
-      // Example: hardcoded or simulated data
-      const simulatedStats = {
-        orders: [
-          { amount: 5000 },
-          { amount: 3500 },
-          { amount: 6200 },
-          { amount: 8500 },
-        ],
-      };
+      const reservationsRef = ref(database, "Reservations/ReservationsByBranch");
+      const snapshot = await get(reservationsRef);
 
-      const revenue = simulatedStats.orders.reduce(
-        (sum, order) => sum + order.amount,
-        0
-      );
+      if (!snapshot.exists()) return;
 
-      setTotalRevenue(revenue);
+      const data = snapshot.val();
+      const now = new Date();
+      const lastMonth = subMonths(now, 1);
+
+      let currentMonthRevenue = 0;
+      let previousMonthRevenue = 0;
+
+      Object.values(data).forEach((branch: any) => {
+        Object.keys(branch).forEach((dateKey) => {
+          const parsedDate = parse(dateKey, "MM-dd-yyyy", new Date());
+
+          Object.values(branch[dateKey]).forEach((transaction: any) => {
+            if (transaction.status === "completed") {
+              const amount = Number(transaction.amountDue || 0);
+              if (isSameMonth(parsedDate, now)) {
+                currentMonthRevenue += amount;
+              } else if (isSameMonth(parsedDate, lastMonth)) {
+                previousMonthRevenue += amount;
+              }
+            }
+          });
+        });
+      });
+
+      setTotalRevenue(currentMonthRevenue);
+
+      if (previousMonthRevenue > 0) {
+        const growth = ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
+        setRevenueGrowth(parseFloat(growth.toFixed(1)));
+      } else {
+        setRevenueGrowth(0);
+      }
     };
 
     fetchRevenue();
@@ -53,7 +76,9 @@ const TotalRevenueCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">₱{totalRevenue.toLocaleString()}</div>
-        <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+        <p className="text-xs text-muted-foreground">
+          {revenueGrowth >= 0 ? `+${revenueGrowth}%` : `${revenueGrowth}%`} from last month
+        </p>
       </CardContent>
     </Card>
   );
