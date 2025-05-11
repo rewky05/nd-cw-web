@@ -5,25 +5,63 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { database } from "@/lib/firebase";
+import { ref, get } from "firebase/database";
+import { parse, isAfter, subWeeks } from "date-fns";
 
 const ActiveUsersCard: React.FC = () => {
   const [activeUsers, setActiveUsers] = useState<number>(0);
 
   useEffect(() => {
-    // Simulated user data – replace with actual API or Firebase data
-    const fetchUsers = async () => {
-      const users = [
-        { id: 1, name: "Alice", isActive: true },
-        { id: 2, name: "Bob", isActive: true },
-        { id: 3, name: "Carol", isActive: false },
-        { id: 4, name: "David", isActive: true },
-      ];
+    const fetchActiveUsers = async () => {
+      try {
+        const usersSnapshot = await get(ref(database, "users"));
+        if (!usersSnapshot.exists()) {
+          setActiveUsers(0);
+          return;
+        }
 
-      const activeCount = users.filter(user => user.isActive).length;
-      setActiveUsers(activeCount);
+        const usersData = usersSnapshot.val();
+        const defaultUserUIDs = Object.entries(usersData)
+          .filter(([_uid, user]: any) => user.role === "default")
+          .map(([uid]) => uid);
+
+        const reservationsSnapshot = await get(ref(database, "Reservations/ReservationsByUser"));
+        if (!reservationsSnapshot.exists()) {
+          setActiveUsers(0);
+          return;
+        }
+
+        const reservationsData = reservationsSnapshot.val();
+        const oneWeekAgo = subWeeks(new Date(), 1);
+        let count = 0;
+
+        for (const uid of defaultUserUIDs) {
+          const userReservations = reservationsData[uid];
+          if (userReservations) {
+            const hasRecentTransaction = Object.keys(userReservations).some(dateStr => {
+              try {
+                const parsedDate = parse(dateStr, "MM-dd-yyyy", new Date());
+                return isAfter(parsedDate, oneWeekAgo);
+              } catch {
+                return false;
+              }
+            });
+
+            if (hasRecentTransaction) {
+              count++;
+            }
+          }
+        }
+
+        setActiveUsers(count);
+      } catch (error) {
+        console.error("Error fetching active users:", error);
+        setActiveUsers(0);
+      }
     };
 
-    fetchUsers();
+    fetchActiveUsers();
   }, []);
 
   return (
@@ -45,7 +83,7 @@ const ActiveUsersCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{activeUsers}</div>
-        <p className="text-xs text-muted-foreground">+3 since last week</p>
+        <p className="text-xs text-muted-foreground">+{activeUsers} since last week</p>
       </CardContent>
     </Card>
   );

@@ -5,22 +5,50 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { database } from "@/lib/firebase";
+import { ref, get } from "firebase/database";
+import { parse, isWithinInterval, startOfQuarter, endOfQuarter } from "date-fns";
 
 const ActiveBranchesCard: React.FC = () => {
   const [activeBranches, setActiveBranches] = useState<number>(0);
+  const [newBranchesThisQuarter, setNewBranchesThisQuarter] = useState<number>(0);
 
   useEffect(() => {
-    // Simulated data – replace with real API/Firebase call if needed
     const fetchBranches = async () => {
-      const branches = [
-        { id: 1, name: "Manila", isActive: true },
-        { id: 2, name: "Cebu", isActive: true },
-        { id: 3, name: "Davao", isActive: false },
-        { id: 4, name: "Baguio", isActive: true },
-      ];
+      try {
+        const snapshot = await get(ref(database, "Branches"));
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const branches = Object.values(data);
 
-      const activeCount = branches.filter(branch => branch.isActive).length;
-      setActiveBranches(activeCount);
+          setActiveBranches(branches.length);
+
+          const now = new Date();
+          const startQuarter = startOfQuarter(now);
+          const endQuarter = endOfQuarter(now);
+
+          const newBranches = branches.filter((branch: any) => {
+            const dateCreatedStr = branch?.profile?.dateCreated;
+            if (!dateCreatedStr) return false;
+
+            try {
+              const parsedDate = parse(dateCreatedStr, "MM-dd-yyyy", new Date());
+              return isWithinInterval(parsedDate, { start: startQuarter, end: endQuarter });
+            } catch {
+              return false;
+            }
+          });
+
+          setNewBranchesThisQuarter(newBranches.length);
+        } else {
+          setActiveBranches(0);
+          setNewBranchesThisQuarter(0);
+        }
+      } catch (error) {
+        console.error("Error fetching branches:", error);
+        setActiveBranches(0);
+        setNewBranchesThisQuarter(0);
+      }
     };
 
     fetchBranches();
@@ -46,7 +74,9 @@ const ActiveBranchesCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{activeBranches}</div>
-        <p className="text-xs text-muted-foreground">+0 new branches this quarter</p>
+        <p className="text-xs text-muted-foreground">
+          +{newBranchesThisQuarter} new branches this quarter
+        </p>
       </CardContent>
     </Card>
   );
