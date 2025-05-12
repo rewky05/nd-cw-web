@@ -12,6 +12,7 @@ import TotalRevenueCard from "@/components/dashboard/total-revenue-card"
 import BookingsStatCard from "@/components/dashboard/bookings-stat-card"
 import ActiveBranchesCard from "@/components/dashboard/active-branches-card"
 import ActiveUsersCard from "@/components/dashboard/active-users-card"
+import SalesBreakdown from "@/components/dashboard/salesBreakdown/salesBreakdown"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -105,104 +106,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-            <Card className="bg-white border-gray-200">
-              <CardHeader>
-                <CardTitle>Sales Breakdown</CardTitle>
-                <CardDescription>Booking fees, service payments, and online transactions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-1 bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-sm font-medium text-gray-600 mb-2">Booking Fees</div>
-                      <div className="text-2xl font-bold">₱12,450</div>
-                      <div className="text-xs text-gray-500 mt-1 flex items-center">
-                        <svg
-                          className="w-3 h-3 text-[#FFD000] mr-1"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 10l7-7m0 0l7 7m-7-7v18"
-                          />
-                        </svg>
-                        8.2% from last month
-                      </div>
-                    </div>
-                    <div className="col-span-1 bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-sm font-medium text-gray-600 mb-2">Service Payments</div>
-                      <div className="text-2xl font-bold">₱28,350</div>
-                      <div className="text-xs text-gray-500 mt-1 flex items-center">
-                        <svg
-                          className="w-3 h-3 text-[#FFD000] mr-1"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 10l7-7m0 0l7 7m-7-7v18"
-                          />
-                        </svg>
-                        15.7% from last month
-                      </div>
-                    </div>
-                    <div className="col-span-1 bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-sm font-medium text-gray-600 mb-2">Online Transactions</div>
-                      <div className="text-2xl font-bold">₱4,431</div>
-                      <div className="text-xs text-gray-500 mt-1 flex items-center">
-                        <svg
-                          className="w-3 h-3 text-[#FFD000] mr-1"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 10l7-7m0 0l7 7m-7-7v18"
-                          />
-                        </svg>
-                        24.3% from last month
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-8 w-full">
-                    <div className="flex flex-col items-center">
-                      <div className="text-lg font-semibold mb-2">Body Wash</div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div className="bg-[#FFD000] h-4 rounded-full" style={{ width: "65%" }}></div>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">65% of sales</div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <div className="text-lg font-semibold mb-2">Value Wash</div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div className="bg-[#FFD000] h-4 rounded-full" style={{ width: "25%" }}></div>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">25% of sales</div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <div className="text-lg font-semibold mb-2">Add-ons</div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div className="bg-[#FFD000] h-4 rounded-full" style={{ width: "10%" }}></div>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">10% of sales</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SalesBreakdown/>
           </TabsContent>
           <TabsContent value="sales" className="space-y-4">
             <Card className="bg-white border-gray-200">
